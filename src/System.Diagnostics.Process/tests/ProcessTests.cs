@@ -80,7 +80,7 @@ namespace System.Diagnostics.Tests
         {
             bool exitedInvoked = false;
 
-            Process p = CreateProcessInfinite();
+            Process p = CreateProcessLong();
             if (enable.HasValue)
             {
                 p.EnableRaisingEvents = enable.Value;
@@ -115,9 +115,20 @@ namespace System.Diagnostics.Tests
             }
 
             {
-                Process p = CreateProcessInfinite();
+                Process p = CreateProcessLong();
                 StartSleepKillWait(p);
                 Assert.NotEqual(0, p.ExitCode);
+            }
+        }
+
+        [PlatformSpecific(PlatformID.AnyUnix)]
+        [Fact]
+        public void TestUseShellExecute_Unix_Succeeds()
+        {
+            using (var p = Process.Start(new ProcessStartInfo { UseShellExecute = true, FileName = "exit", Arguments = "42" }))
+            {
+                Assert.True(p.WaitForExit(WaitInMS));
+                Assert.Equal(42, p.ExitCode);
             }
         }
 
@@ -125,7 +136,7 @@ namespace System.Diagnostics.Tests
         public void TestExitTime()
         {
             DateTime timeBeforeProcessStart = DateTime.UtcNow;
-            Process p = CreateProcessInfinite();
+            Process p = CreateProcessLong();
             p.Start();
             Assert.Throws<InvalidOperationException>(() => p.ExitTime);
             p.Kill();
@@ -158,7 +169,7 @@ namespace System.Diagnostics.Tests
             }
 
             {
-                Process p = CreateProcessInfinite();
+                Process p = CreateProcessLong();
                 p.Start();
                 try
                 {
@@ -331,6 +342,7 @@ namespace System.Diagnostics.Tests
             Assert.True(_process.VirtualMemorySize64 > 0);
         }
 
+        [ActiveIssue(3281, PlatformID.OSX)]
         [Fact]
         public void TestWorkingSet64()
         {
@@ -361,7 +373,7 @@ namespace System.Diagnostics.Tests
         public void TestProcessStartTime()
         {
             DateTime timeBeforeCreatingProcess = DateTime.UtcNow;
-            Process p = CreateProcessInfinite();
+            Process p = CreateProcessLong();
 
             Assert.Throws<InvalidOperationException>(() => p.StartTime);
             try
@@ -586,7 +598,7 @@ namespace System.Diagnostics.Tests
         public void TestStartInfo()
         {
             {
-                Process process = CreateProcessInfinite();
+                Process process = CreateProcessLong();
                 process.Start();
 
                 Assert.Equal(HostRunner, process.StartInfo.FileName);
@@ -596,7 +608,7 @@ namespace System.Diagnostics.Tests
             }
 
             {
-                Process process = CreateProcessInfinite();
+                Process process = CreateProcessLong();
                 process.Start();
 
                 Assert.Throws<System.InvalidOperationException>(() => (process.StartInfo = new ProcessStartInfo()));

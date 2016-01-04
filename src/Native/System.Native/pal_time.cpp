@@ -3,6 +3,7 @@
 
 #include "pal_config.h"
 #include "pal_time.h"
+#include "pal_utilities.h"
 
 #include <assert.h>
 #include <utime.h>
@@ -20,8 +21,8 @@ enum
 
 static void ConvertUTimBuf(const UTimBuf& pal, utimbuf& native)
 {
-    native.actime = pal.AcTime;
-    native.modtime = pal.ModTime;
+    native.actime = static_cast<time_t>(pal.AcTime);
+    native.modtime = static_cast<time_t>(pal.ModTime);
 }
 
 extern "C" int32_t UTime(const char* path, UTimBuf* times)
@@ -30,7 +31,10 @@ extern "C" int32_t UTime(const char* path, UTimBuf* times)
 
     utimbuf temp;
     ConvertUTimBuf(*times, temp);
-    return utime(path, &temp);
+
+    int32_t result;
+    while (CheckInterrupted(result = utime(path, &temp)));
+    return result;
 }
 
 extern "C" int32_t GetTimestampResolution(uint64_t* resolution)

@@ -45,7 +45,6 @@ namespace System.Net.Http
     public class WinHttpHandler : HttpMessageHandler
 #endif
     {
-        private const string HeaderNameCookie = "Cookie";
         private static readonly TimeSpan s_maxTimeout = TimeSpan.FromMilliseconds(int.MaxValue);
 
         private object _lockObject = new object();
@@ -595,21 +594,6 @@ namespace System.Net.Http
             return chunkedMode;
         }
 
-        internal static string GetCookieHeader(Uri uri, CookieContainer cookies)
-        {
-            string cookieHeader = null;
-
-            Debug.Assert(cookies != null);
-
-            string cookieValues = cookies.GetCookieHeader(uri);
-            if (!string.IsNullOrEmpty(cookieValues))
-            {
-                cookieHeader = string.Format(CultureInfo.InvariantCulture, "{0}: {1}", HeaderNameCookie, cookieValues);
-            }
-
-            return cookieHeader;
-        }
-
         private static void AddRequestHeaders(
             SafeWinHttpHandle requestHandle,
             HttpRequestMessage requestMessage,
@@ -620,7 +604,7 @@ namespace System.Net.Http
             // Manually add cookies.
             if (cookies != null)
             {
-                string cookieHeader = GetCookieHeader(requestMessage.RequestUri, cookies);
+                string cookieHeader = WinHttpCookieContainerAdapter.GetCookieHeader(requestMessage.RequestUri, cookies);
                 if (!string.IsNullOrEmpty(cookieHeader))
                 {
                     requestHeadersBuffer.AppendLine(cookieHeader);
@@ -791,12 +775,24 @@ namespace System.Net.Http
                     secureConnection = false;
                 }
 
+                // Try to use the requested version if a known/supported version was explicitly requested.
+                // Otherwise, we simply use winhttp's default.
+                string httpVersion = null;
+                if (state.RequestMessage.Version == HttpVersion.Version10)
+                {
+                    httpVersion = "HTTP/1.0";
+                }
+                else if (state.RequestMessage.Version == HttpVersion.Version11)
+                {
+                    httpVersion = "HTTP/1.1";
+                }
+
                 // Create an HTTP request handle.
                 state.RequestHandle = Interop.WinHttp.WinHttpOpenRequest(
                     connectHandle,
                     state.RequestMessage.Method.Method,
                     state.RequestMessage.RequestUri.PathAndQuery,
-                    null,
+                    httpVersion,
                     Interop.WinHttp.WINHTTP_NO_REFERER,
                     Interop.WinHttp.WINHTTP_DEFAULT_ACCEPT_TYPES,
                     secureConnection ? Interop.WinHttp.WINHTTP_FLAG_SECURE : 0);
@@ -842,6 +838,13 @@ namespace System.Net.Http
                         bool receivedResponse = await InternalReceiveResponseHeadersAsync(state).ConfigureAwait(false);
                         if (receivedResponse)
                         {
+                            // If we're manually handling cookies, we need to add them to the container after
+                            // each response has been received.
+                            if (state.Handler.CookieUsePolicy == CookieUsePolicy.UseSpecifiedCookieContainer)
+                            {
+                                WinHttpCookieContainerAdapter.AddResponseCookiesToContainer(state);
+                            }
+
                             _authHelper.CheckResponseForAuthentication(
                                 state,
                                 ref proxyAuthScheme,
@@ -1262,6 +1265,9 @@ namespace System.Net.Http
             SafeWinHttpHandle requestHandle,
             Interop.WinHttp.WINHTTP_STATUS_CALLBACK callback)
         {
+            // TODO: Issue #5036. Having the status callback use WINHTTP_CALLBACK_FLAG_ALL_NOTIFICATIONS
+            // isn't strictly necessary. However, some of the notification flags are required.
+            // This will be addressed this as part of WinHttpHandler performance improvements.
             IntPtr oldCallback = Interop.WinHttp.WinHttpSetStatusCallback(
                 requestHandle,
                 callback,

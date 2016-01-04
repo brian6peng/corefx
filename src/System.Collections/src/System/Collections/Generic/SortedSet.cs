@@ -141,7 +141,8 @@ namespace System.Collections.Generic
                 T[] els = EnumerableHelpers.ToArray(collection, out count);
                 if (count > 0)
                 {
-                    Array.Sort(els, 0, count, _comparer);
+                    comparer = _comparer; // If comparer is null, sets it to Comparer<T>.Default
+                    Array.Sort(els, 0, count, comparer);
                     int index = 1;
                     for (int i = 1; i < count; i++)
                     {
@@ -1648,8 +1649,8 @@ namespace System.Collections.Generic
             SortedSet<T> asSorted = other as SortedSet<T>;
             if (asSorted != null && AreComparersEqual(this, asSorted))
             {
-                IEnumerator<T> mine = this.GetEnumerator();
-                IEnumerator<T> theirs = asSorted.GetEnumerator();
+                Enumerator mine = GetEnumerator();
+                Enumerator theirs = asSorted.GetEnumerator();
                 bool mineEnded = !mine.MoveNext();
                 bool theirsEnded = !theirs.MoveNext();
                 while (!mineEnded && !theirsEnded)

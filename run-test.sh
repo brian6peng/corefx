@@ -21,18 +21,18 @@ usage()
     echo "Input sources:"
     echo "    --coreclr-bins <location>         Location of root of the binaries directory"
     echo "                                      containing the FreeBSD, Linux or OSX coreclr build"
-    echo "                                      default: <repo_root>/bin/Product/<OS>.x64.<Configuration>"
+    echo "                                      default: <repo_root>/bin/Product/<OS>.x64.<ConfigurationGroup>"
     echo "    --mscorlib-bins <location>        Location of the root binaries directory containing"
     echo "                                      the FreeBSD, Linux or OSX mscorlib.dll"
-    echo "                                      default: <repo_root>/bin/Product/<OS>.x64.<Configuration>"
+    echo "                                      default: <repo_root>/bin/Product/<OS>.x64.<ConfigurationGroup>"
     echo "    --corefx-tests <location>         Location of the root binaries location containing"
     echo "                                      the tests to run"
-    echo "                                      default: <repo_root>/bin/tests/<OS>.AnyCPU.<Configuration>"
+    echo "                                      default: <repo_root>/bin/tests/<OS>.AnyCPU.<ConfigurationGroup>"
     echo "    --corefx-native-bins <location>   Location of the FreeBSD, Linux or OSX native corefx binaries"
-    echo "                                      default: <repo_root>/bin/<OS>.x64.<Configuration>"
+    echo "                                      default: <repo_root>/bin/<OS>.x64.<ConfigurationGroup>"
     echo
     echo "Flavor/OS options:"
-    echo "    --configuration <config>          Configuration to run (Debug/Release)"
+    echo "    --configurationGroup <config>     ConfigurationGroup to run (Debug/Release)"
     echo "                                      default: Debug"
     echo "    --os <os>                         OS to run (FreeBSD, Linux or OSX)"
     echo "                                      default: detect current OS"
@@ -45,7 +45,7 @@ usage()
     echo "    --coreclr-coverage                Optional argument to get coreclr code coverage reports"
     echo "    --coreclr-objs <location>         Location of root of the object directory"
     echo "                                      containing the FreeBSD, Linux or OSX coreclr build"
-    echo "                                      default: <repo_root>/bin/obj/<OS>.x64.<Configuration>"
+    echo "                                      default: <repo_root>/bin/obj/<OS>.x64.<ConfigurationGroup"
     echo "    --coreclr-src <location>          Location of root of the directory"
     echo "                                      containing the coreclr source files"
     echo
@@ -54,8 +54,8 @@ usage()
 
 ProjectRoot="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 # Location parameters
-# OS/Configuration defaults
-Configuration="Debug"
+# OS/ConfigurationGroup defaults
+ConfigurationGroup="Debug"
 OSName=$(uname -s)
 case $OSName in
     Darwin)
@@ -78,7 +78,7 @@ esac
 # Misc defaults
 TestSelection=".*"
 TestsFailed=0
-OverlayDir="$ProjectRoot/bin/tests/$OS.AnyCPU.$Configuration/TestOverlay/"
+OverlayDir="$ProjectRoot/bin/tests/$OS.AnyCPU.$ConfigurationGroup/TestOverlay/"
 
 create_test_overlay()
 {
@@ -89,12 +89,12 @@ create_test_overlay()
   rm -rf $OverlayDir
   mkdir -p $OverlayDir
   
-  local LowerConfiguration="$(echo $Configuration | awk '{print tolower($0)}')"
+  local LowerConfigurationGroup="$(echo $ConfigurationGroup | awk '{print tolower($0)}')"
  
   # Copy the CoreCLR native binaries
   if [ ! -d $CoreClrBins ]
   then
-	echo "Coreclr $OS binaries not found at $CoreClrBins"
+	echo "error: Coreclr $OS binaries not found at $CoreClrBins"
 	exit 1
   fi
   cp -r $CoreClrBins/* $OverlayDir
@@ -103,7 +103,7 @@ create_test_overlay()
   # TODO When the mscorlib flavors get properly changed then 
   if [ ! -f $mscorlibLocation ]
   then
-	echo "Mscorlib not found at $mscorlibLocation"
+	echo "error: Mscorlib not found at $mscorlibLocation"
 	exit 1
   fi
   cp -r $mscorlibLocation $OverlayDir
@@ -111,7 +111,7 @@ create_test_overlay()
   # Then the native CoreFX binaries
   if [ ! -d $CoreFxNativeBins ]
   then
-	echo "Corefx native binaries should be built (use build.sh native in root)"
+	echo "error: Corefx native binaries should be built (use build.sh native in root)"
 	exit 1
   fi
   cp $CoreFxNativeBins/* $OverlayDir
@@ -158,7 +158,7 @@ runtest()
 
   if [ ! -d "$dirName" ] || [ ! -f "$dirName/$testDllName" ]
   then
-    echo "Did not find corresponding test dll for $testProject at $dirName/$testDllName"
+    echo "error: Did not find corresponding test dll for $testProject at $dirName/$testDllName"
     exit 1
   fi
 
@@ -186,7 +186,7 @@ runtest()
 
   if [ $exitCode -ne 0 ]
   then
-      echo "One or more tests failed while running tests from '$fileNameWithoutExtension'.  Exit code $exitCode."
+      echo "error: One or more tests failed while running tests from '$fileNameWithoutExtension'.  Exit code $exitCode."
   fi
 
   popd > /dev/null
@@ -197,13 +197,13 @@ coreclr_code_coverage()
 {
   if [ ! "$OS" == "FreeBSD" ] && [ ! "$OS" == "Linux" ] && [ ! "$OS" == "OSX" ]
   then
-      echo "Code Coverage not supported on $OS"
+      echo "error: Code Coverage not supported on $OS"
       exit 1
   fi
 
   if [ "$CoreClrSrc" == "" ]
     then
-      echo "Coreclr source files are required to generate code coverage reports"
+      echo "error: Coreclr source files are required to generate code coverage reports"
       echo "Coreclr source files root path can be passed using '--coreclr-src' argument"
       exit 1
   fi
@@ -268,8 +268,8 @@ do
         --restrict-proj)
         TestSelection=$2
         ;;
-        --configuration)
-        Configuration=$2
+        --configurationGroup)
+        ConfigurationGroup=$2
         ;;
         --os)
         OS=$2
@@ -293,47 +293,47 @@ done
 
 if [ "$CoreClrBins" == "" ]
 then
-    CoreClrBins="$ProjectRoot/bin/Product/$OS.x64.$Configuration"
+    CoreClrBins="$ProjectRoot/bin/Product/$OS.x64.$ConfigurationGroup"
 fi
 
 if [ "$MscorlibBins" == "" ]
 then
-    MscorlibBins="$ProjectRoot/bin/Product/$OS.x64.$Configuration"
+    MscorlibBins="$ProjectRoot/bin/Product/$OS.x64.$ConfigurationGroup"
 fi
 
 if [ "$CoreFxTests" == "" ]
 then
-    CoreFxTests="$ProjectRoot/bin/tests/$OS.AnyCPU.$Configuration"
+    CoreFxTests="$ProjectRoot/bin/tests/$OS.AnyCPU.$ConfigurationGroup"
 fi
 
 if [ "$CoreFxNativeBins" == "" ]
 then
-    CoreFxNativeBins="$ProjectRoot/bin/$OS.x64.$Configuration/Native"
+    CoreFxNativeBins="$ProjectRoot/bin/$OS.x64.$ConfigurationGroup/Native"
 fi
 
 # Check parameters up front for valid values:
 
-if [ ! "$Configuration" == "Debug" ] && [ ! "$Configuration" == "Release" ]
+if [ ! "$ConfigurationGroup" == "Debug" ] && [ ! "$ConfigurationGroup" == "Release" ]
 then
-    echo "Configuration should be Debug or Release"
+    echo "error: ConfigurationGroup should be Debug or Release"
     exit 1
 fi
 
 if [ ! "$OS" == "FreeBSD" ] && [ ! "$OS" == "Linux" ] && [ ! "$OS" == "OSX" ]
 then
-    echo "OS should be FreeBSD, Linux or OSX"
+    echo "error: OS should be FreeBSD, Linux or OSX"
     exit 1
 fi
 
 if [ "$CoreClrObjs" == "" ]
 then
-    CoreClrObjs="$ProjectRoot/bin/obj/$OS.x64.$Configuration"
+    CoreClrObjs="$ProjectRoot/bin/obj/$OS.x64.$ConfigurationGroup"
 fi
 
 
 create_test_overlay
 
-# Walk the directory tree rooted at src bin/tests/$OS.AnyCPU.$Configuration/
+# Walk the directory tree rooted at src bin/tests/$OS.AnyCPU.$ConfigurationGroup/
 
 TestsFailed=0
 numberOfProcesses=0

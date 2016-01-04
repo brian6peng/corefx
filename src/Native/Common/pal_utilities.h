@@ -7,11 +7,16 @@
 #include "pal_config.h"
 
 #include <assert.h>
+#include <errno.h>
 #include <limits>
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 #include <type_traits>
+
+#if HAVE_OPEN_MAX
+#include <sys/syslimits.h>
+#endif
 
 /**
  * ResultOf<T> is shorthand for typename std::result_of<T>::type.
@@ -109,4 +114,38 @@ inline void SafeStringCopy(char* destination, int32_t destinationSize, const cha
         size_t unsignedSize = UnsignedCast(destinationSize);
         SafeStringCopy(destination, unsignedSize, source);
     }
+}
+
+/**
+* Converts an intptr_t to a file descriptor.
+* intptr_t is the type used to marshal file descriptors so we can use SafeHandles effectively.
+*/
+inline static int ToFileDescriptor(intptr_t fd)
+{
+#if HAVE_OPEN_MAX
+    assert(0 <= fd && fd <= OPEN_MAX);
+#else
+    assert(0 <= fd && fd <= INT32_MAX);
+#endif
+
+    return static_cast<int>(fd);
+}
+
+/**
+* Converts an intptr_t to a file descriptor.
+* intptr_t is the type used to marshal file descriptors so we can use SafeHandles effectively.
+*/
+inline static int ToFileDescriptorUnchecked(intptr_t fd)
+{
+    return static_cast<int>(fd);
+}
+
+/**
+* Checks if the IO operation was interupted and needs to be retried.
+* Returns true if the operation was interupted; otherwise, false.
+*/
+template <typename TInt>
+static inline bool CheckInterrupted(TInt result)
+{
+    return result < 0 && errno == EINTR;
 }

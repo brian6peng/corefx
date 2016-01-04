@@ -90,14 +90,9 @@ namespace System.Diagnostics
                             int totalBytesWritten = 0;
                             while (bufCount > 0)
                             {
-                                int bytesWritten = Interop.Sys.Write((int)fileHandle.DangerousGetHandle(), buf + totalBytesWritten, bufCount);
+                                int bytesWritten = Interop.Sys.Write(fileHandle, buf + totalBytesWritten, bufCount);
                                 if (bytesWritten < 0)
                                 {
-                                    if (Interop.Sys.GetLastErrorInfo().Error == Interop.Error.EINTR)
-                                    {
-                                        continue;
-                                    }
-
                                     // On error, simply stop writing the debug output.  This could commonly happen if stderr
                                     // was piped to a program that ended before this program did, resulting in EPIPE errors.
                                     return;

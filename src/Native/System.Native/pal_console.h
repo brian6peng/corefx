@@ -29,7 +29,17 @@ extern "C" int32_t GetWindowSize(WinSize* windowsSize);
  * Returns 1 if the file descriptor is referring to a terminal;
  * otherwise returns 0 and sets errno.
  */
-extern "C" int32_t IsATty(int filedes);
+extern "C" int32_t IsATty(intptr_t fd);
+
+/**
+ * Initializes the console for use by System.Console.
+ */
+extern "C" void InitializeConsole();
+
+/**
+ * Returns 1 if any input is waiting on stdin; otherwise, 0.
+ */
+extern "C" int32_t StdinReady();
 
 /**
  * Reads the number of bytes specified into the provided buffer from stdin.

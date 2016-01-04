@@ -14,6 +14,7 @@
 #include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
+#include <poll.h>
 
 extern "C" int32_t GetWindowSize(WinSize* windowSize)
 {
@@ -34,9 +35,51 @@ extern "C" int32_t GetWindowSize(WinSize* windowSize)
 #endif
 }
 
-extern "C" int32_t IsATty(int fd)
+extern "C" int32_t IsATty(intptr_t fd)
 {
-    return isatty(fd);
+    return isatty(ToFileDescriptor(fd));
+}
+
+static bool g_initialized = false;
+static termios g_originalTermios = { };
+
+static void UninitializeConsole()
+{
+    assert(g_initialized);
+    if (g_initialized)
+    {
+        g_initialized = false;
+        tcsetattr(STDIN_FILENO, TCSANOW, &g_originalTermios);
+    }
+}
+
+extern "C" void InitializeConsole()
+{
+    assert(!g_initialized);
+
+#if HAVE_TCGETATTR && HAVE_TCSETATTR && HAVE_ECHO && HAVE_ICANON && HAVE_TCSANOW
+    struct termios newtermios = {};
+    if (tcgetattr(STDIN_FILENO, &newtermios) >= 0)
+    {
+        g_originalTermios = newtermios;
+        newtermios.c_lflag &= static_cast<uint32_t>(~(ECHO | ICANON));
+        newtermios.c_cc[VMIN] = 1;
+        newtermios.c_cc[VTIME] = 0;
+        if (tcsetattr(STDIN_FILENO, TCSANOW, &newtermios) >= 0)
+        {
+            g_initialized = true;
+            atexit(UninitializeConsole);
+        }
+    }
+#endif
+}
+
+extern "C" int32_t StdinReady()
+{
+    struct pollfd fd;
+    fd.fd = STDIN_FILENO;
+    fd.events = POLLIN;
+    return poll(&fd, 1, 0) > 0 ? 1 : 0;
 }
 
 extern "C" int32_t ReadStdinUnbuffered(void* buffer, int32_t bufferSize)
@@ -50,26 +93,9 @@ extern "C" int32_t ReadStdinUnbuffered(void* buffer, int32_t bufferSize)
         return -1;
     }
 
-#if HAVE_TCGETATTR && HAVE_TCSETATTR && HAVE_ECHO && HAVE_ICANON && HAVE_TCSANOW
-    struct termios oldtermios = {};
-    struct termios newtermios = {};
-
-    if (tcgetattr(STDIN_FILENO, &oldtermios) < 0)
-        return -1;
-
-    newtermios = oldtermios;
-    newtermios.c_lflag &= static_cast<uint32_t>(~(ECHO | ICANON));
-    newtermios.c_cc[VMIN] = 1;
-    newtermios.c_cc[VTIME] = 0;
-    if (tcsetattr(STDIN_FILENO, TCSANOW, &newtermios) < 0)
-        return -1;
-    ssize_t count = read(STDIN_FILENO, buffer, UnsignedCast(bufferSize));
-    tcsetattr(STDIN_FILENO, TCSANOW, &oldtermios);
+    ssize_t count;
+    while (CheckInterrupted(count = read(STDIN_FILENO, buffer, UnsignedCast(bufferSize))));
     return static_cast<int32_t>(count);
-#else
-    errno = ENOTSUP;
-    return -1;
-#endif
 }
 
 static volatile CtrlCallback g_ctrlCallback = nullptr; // Callback invoked for SIGINT/SIGQUIT

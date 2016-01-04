@@ -311,7 +311,9 @@ extern "C" int32_t WaitPid(int32_t pid, int32_t* status, WaitPidOptions options)
 {
     assert(status != nullptr);
 
-    return waitpid(pid, status, static_cast<int>(options));
+    int32_t result;
+    while (CheckInterrupted(result = waitpid(pid, status, static_cast<int>(options))));
+    return result;
 }
 
 extern "C" int32_t WExitStatus(int32_t status)
@@ -436,7 +438,7 @@ extern "C" int32_t SchedSetAffinity(int32_t pid, intptr_t* mask)
     intptr_t bits = *mask; 
     for (int cpu = 0; cpu < maxCpu; cpu++)
     {
-        if ((bits & (1u << cpu)) != 0)
+        if ((bits & static_cast<intptr_t>(1u << cpu)) != 0)
         {
             CPU_SET(cpu, &set);
         }

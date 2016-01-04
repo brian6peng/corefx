@@ -22,6 +22,14 @@
     "System.Threading.Tasks": "4.0.10"
   },
   "frameworks": {
-    "dnxcore50": {}
+    "dnxcore50": {
+        "dependencies": {
+        }
+    },
+    "net46": {
+        "dependencies": {
+           "Microsoft.TargetingPack.NETFramework.v4.6": "1.0.0-rc2-23530"
+        }
+    }
   }
 }

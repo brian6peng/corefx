@@ -31,6 +31,20 @@ namespace System.Net.Http.Functional.Tests
         public readonly static object[][] EchoServers = HttpTestServers.EchoServers;
         public readonly static object[][] VerifyUploadServers = HttpTestServers.VerifyUploadServers;
         public readonly static object[][] CompressedServers = HttpTestServers.CompressedServers;
+        public readonly static object[][] HeaderValueAndUris = {
+            new object[] { "X-CustomHeader", "x-value", HttpTestServers.RemoteEchoServer },
+            new object[] { "X-Cust-Header-NoValue", "" , HttpTestServers.RemoteEchoServer },
+            new object[] { "X-CustomHeader", "x-value", HttpTestServers.RedirectUriForDestinationUri(
+                secure:false,
+                destinationUri:HttpTestServers.RemoteEchoServer,
+                hops:1) },
+            new object[] { "X-Cust-Header-NoValue", "" , HttpTestServers.RedirectUriForDestinationUri(
+                secure:false,
+                destinationUri:HttpTestServers.RemoteEchoServer,
+                hops:1) },
+        };
+        public readonly static object[][] Http2Servers = HttpTestServers.Http2Servers;
+
 
         // Standard HTTP methods defined in RFC7231: http://tools.ietf.org/html/rfc7231#section-4.3
         //     "GET", "HEAD", "POST", "PUT", "DELETE", "OPTIONS", "TRACE"
@@ -194,7 +208,7 @@ namespace System.Net.Http.Functional.Tests
             handler.Credentials = _credential;
             using (var client = new HttpClient(handler))
             {
-                Uri uri = HttpTestServers.BasicAuthUriForCreds(false, Username, Password);
+                Uri uri = HttpTestServers.BasicAuthUriForCreds(secure:false, userName:Username, password:Password);
                 using (HttpResponseMessage response = await client.GetAsync(uri))
                 {
                     Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -207,7 +221,7 @@ namespace System.Net.Http.Functional.Tests
         {
             using (var client = new HttpClient())
             {
-                Uri uri = HttpTestServers.BasicAuthUriForCreds(false, Username, Password);
+                Uri uri = HttpTestServers.BasicAuthUriForCreds(secure:false, userName:Username, password:Password);
                 using (HttpResponseMessage response = await client.GetAsync(uri))
                 {
                     Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
@@ -222,7 +236,10 @@ namespace System.Net.Http.Functional.Tests
             handler.AllowAutoRedirect = false;
             using (var client = new HttpClient(handler))
             {
-                Uri uri = HttpTestServers.RedirectUriForDestinationUri(false, HttpTestServers.RemoteEchoServer, 1);
+                Uri uri = HttpTestServers.RedirectUriForDestinationUri(
+                    secure:false,
+                    destinationUri:HttpTestServers.RemoteEchoServer,
+                    hops:1);
                 _output.WriteLine("Uri: {0}", uri);
                 using (HttpResponseMessage response = await client.GetAsync(uri))
                 {
@@ -238,7 +255,10 @@ namespace System.Net.Http.Functional.Tests
             handler.AllowAutoRedirect = true;
             using (var client = new HttpClient(handler))
             {
-                Uri uri = HttpTestServers.RedirectUriForDestinationUri(false, HttpTestServers.RemoteEchoServer, 1);
+                Uri uri = HttpTestServers.RedirectUriForDestinationUri(
+                    secure:false,
+                    destinationUri:HttpTestServers.RemoteEchoServer,
+                    hops:1);
                 _output.WriteLine("Uri: {0}", uri);
                 using (HttpResponseMessage response = await client.GetAsync(uri))
                 {
@@ -254,7 +274,10 @@ namespace System.Net.Http.Functional.Tests
             handler.AllowAutoRedirect = true;
             using (var client = new HttpClient(handler))
             {
-                Uri uri = HttpTestServers.RedirectUriForDestinationUri(false, HttpTestServers.SecureRemoteEchoServer, 1);
+                Uri uri = HttpTestServers.RedirectUriForDestinationUri(
+                    secure:false,
+                    destinationUri:HttpTestServers.SecureRemoteEchoServer,
+                    hops:1);
                 _output.WriteLine("Uri: {0}", uri);
                 using (HttpResponseMessage response = await client.GetAsync(uri))
                 {
@@ -270,11 +293,31 @@ namespace System.Net.Http.Functional.Tests
             handler.AllowAutoRedirect = true;
             using (var client = new HttpClient(handler))
             {
-                Uri uri = HttpTestServers.RedirectUriForDestinationUri(true, HttpTestServers.RemoteEchoServer, 1);
+                Uri uri = HttpTestServers.RedirectUriForDestinationUri(
+                    secure:true,
+                    destinationUri:HttpTestServers.RemoteEchoServer,
+                    hops:1);
                 _output.WriteLine("Uri: {0}", uri);
                 using (HttpResponseMessage response = await client.GetAsync(uri))
                 {
                     Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+                }
+            }
+        }
+
+        [Fact]
+        public async Task GetAsync_AllowAutoRedirectTrue_RedirectToUriWithParams_RequestMsgUriSet()
+        {
+            var handler = new HttpClientHandler();
+            handler.AllowAutoRedirect = true;
+            Uri targetUri = HttpTestServers.BasicAuthUriForCreds(secure:false, userName:Username, password:Password);
+            using (var client = new HttpClient(handler))
+            {
+                Uri uri = HttpTestServers.RedirectUriForDestinationUri(secure:false, destinationUri:targetUri, hops:1);
+                _output.WriteLine("Uri: {0}", uri);
+                using (HttpResponseMessage response = await client.GetAsync(uri))
+                {
+                    Assert.Equal(targetUri, response.RequestMessage.RequestUri);
                 }
             }
         }
@@ -289,9 +332,9 @@ namespace System.Net.Http.Functional.Tests
             {
                 await Assert.ThrowsAsync<HttpRequestException>(() => 
                     client.GetAsync(HttpTestServers.RedirectUriForDestinationUri(
-                        false,
-                        HttpTestServers.RemoteEchoServer,
-                        hops + 1)));
+                        secure:false,
+                        destinationUri:HttpTestServers.RemoteEchoServer,
+                        hops:(hops + 1))));
             }
         }
 
@@ -302,7 +345,7 @@ namespace System.Net.Http.Functional.Tests
             handler.Credentials = _credential;
             using (var client = new HttpClient(handler))
             {
-                Uri redirectUri = HttpTestServers.RedirectUriForCreds(false, Username, Password);
+                Uri redirectUri = HttpTestServers.RedirectUriForCreds(secure:false, userName:Username, password:Password);
                 using (HttpResponseMessage unAuthResponse = await client.GetAsync(redirectUri))
                 {
                     Assert.Equal(HttpStatusCode.Unauthorized, unAuthResponse.StatusCode);
@@ -313,8 +356,8 @@ namespace System.Net.Http.Functional.Tests
         [Fact]
         public async Task GetAsync_CredentialIsCredentialCacheUriRedirect_StatusCodeOK()
         {
-            Uri uri = HttpTestServers.BasicAuthUriForCreds(false, Username, Password);
-            Uri redirectUri = HttpTestServers.RedirectUriForCreds(false, Username, Password);
+            Uri uri = HttpTestServers.BasicAuthUriForCreds(secure:false, userName:Username, password:Password);
+            Uri redirectUri = HttpTestServers.RedirectUriForCreds(secure:false, userName:Username, password:Password);
             _output.WriteLine(uri.AbsoluteUri);
             _output.WriteLine(redirectUri.AbsoluteUri);
             var credentialCache = new CredentialCache();
@@ -346,12 +389,12 @@ namespace System.Net.Http.Functional.Tests
         }
 
         [Theory]
-        [InlineData("cookiename", "cookievalue")]
-        public async Task GetAsync_SetCookieContainer_CookieSent(string name, string value)
+        [InlineData("cookieName1", "cookieValue1")]
+        public async Task GetAsync_SetCookieContainer_CookieSent(string cookieName, string cookieValue)
         {
             var handler = new HttpClientHandler();
             var cookieContainer = new CookieContainer();
-            cookieContainer.Add(HttpTestServers.RemoteEchoServer, new Cookie(name, value));
+            cookieContainer.Add(HttpTestServers.RemoteEchoServer, new Cookie(cookieName, cookieValue));
             handler.CookieContainer = cookieContainer;
             using (var client = new HttpClient(handler))
             {
@@ -360,20 +403,40 @@ namespace System.Net.Http.Functional.Tests
                     Assert.Equal(HttpStatusCode.OK, httpResponse.StatusCode);
                     string responseText = await httpResponse.Content.ReadAsStringAsync();
                     _output.WriteLine(responseText);
-                    Assert.True(TestHelper.JsonMessageContainsKeyValue(responseText, "Cookie", name + "=" + value));
+                    Assert.True(TestHelper.JsonMessageContainsKeyValue(responseText, cookieName, cookieValue));
                 }
             }
         }
 
         [Theory]
-        [InlineData("X-Cust-Header", "x-value")]
-        [InlineData("X-Cust-Header-NoValue", "")]
-        public async Task GetAsync_RequestHeadersAddCustomHeaders_HeaderAndValueSent(string name, string value)
+        [InlineData("cookieName1", "cookieValue1")]
+        public async Task GetAsync_RedirectResponseHasCookie_CookieSentToFinalUri(string cookieName, string cookieValue)
+        {
+            Uri uri = HttpTestServers.RedirectUriForDestinationUri(
+                secure:false,
+                destinationUri:HttpTestServers.RemoteEchoServer,
+                hops:1);
+            using (HttpClient client = new HttpClient())
+            {
+                client.DefaultRequestHeaders.Add(
+                    "X-SetCookie",
+                    string.Format("{0}={1};Path=/", cookieName, cookieValue));
+                using (HttpResponseMessage httpResponse = await client.GetAsync(uri))
+                {
+                    string responseText = await httpResponse.Content.ReadAsStringAsync();
+                    _output.WriteLine(responseText);
+                    Assert.True(TestHelper.JsonMessageContainsKeyValue(responseText, cookieName, cookieValue));
+                }
+            }            
+        }
+
+        [Theory, MemberData("HeaderValueAndUris")]
+        public async Task GetAsync_RequestHeadersAddCustomHeaders_HeaderAndValueSent(string name, string value, Uri uri)
         {
             using (var client = new HttpClient())
             {
                 client.DefaultRequestHeaders.Add(name, value);
-                using (HttpResponseMessage httpResponse = await client.GetAsync(HttpTestServers.RemoteEchoServer))
+                using (HttpResponseMessage httpResponse = await client.GetAsync(uri))
                 {
                     Assert.Equal(HttpStatusCode.OK, httpResponse.StatusCode);
                     string responseText = await httpResponse.Content.ReadAsStringAsync();
@@ -632,7 +695,7 @@ namespace System.Net.Http.Functional.Tests
         }
 
         [Fact]
-        [ActiveIssue(3565, PlatformID.AnyUnix)]
+        [ActiveIssue(3565, PlatformID.OSX)]
         public async Task PostAsync_Post_ChannelBindingHasExpectedValue()
         {
             using (var client = new HttpClient())
@@ -697,7 +760,69 @@ namespace System.Net.Http.Functional.Tests
                 }
             }        
         }
-        
+        #endregion
+
+        #region Version tests
+        // The HTTP RFC 7230 states that servers are NOT required to respond back with the same
+        // minor version if they support a higher minor version. In fact, the RFC states that
+        // servers SHOULD send back the highest minor version they support. So, testing the
+        // response version to see if the client sent a particular request version only works
+        // for some servers. In particular the 'Http2Servers' used in these tests always seem
+        // to echo the minor version of the request.
+        [Theory, MemberData("Http2Servers")]
+        public async Task SendAsync_RequestVersion10_ServerReceivesVersion10Request(Uri server)
+        {
+            Version responseVersion = await SendRequestAndGetResponseVersionAsync(new Version(1, 0), server);
+            Assert.Equal(new Version(1, 0), responseVersion);
+        }
+
+        [Theory, MemberData("Http2Servers")]
+        public async Task SendAsync_RequestVersion11_ServerReceivesVersion11Request(Uri server)
+        {
+            Version responseVersion = await SendRequestAndGetResponseVersionAsync(new Version(1, 1), server);
+            Assert.Equal(new Version(1, 1), responseVersion);
+        }
+
+        [Theory, MemberData("Http2Servers")]
+        public async Task SendAsync_RequestVersionNotSpecified_ServerReceivesVersion11Request(Uri server)
+        {
+            Version responseVersion = await SendRequestAndGetResponseVersionAsync(null, server);
+            Assert.Equal(new Version(1, 1), responseVersion);
+        }
+
+        [Theory, MemberData("Http2Servers")]
+        public async Task SendAsync_RequestVersion20_ResponseVersion20IfHttp2Supported(Uri server)
+        {
+            // We don't currently have a good way to test whether HTTP/2 is supported without
+            // using the same mechanism we're trying to test, so for now we allow both 2.0 and 1.1 responses.
+            Version responseVersion = await SendRequestAndGetResponseVersionAsync(new Version(2, 0), server);
+            Assert.True(
+                responseVersion == new Version(2, 0) || 
+                responseVersion == new Version(1, 1),
+                "Response version " + responseVersion);
+        }
+
+        private async Task<Version> SendRequestAndGetResponseVersionAsync(Version requestVersion, Uri server)
+        {
+            var request = new HttpRequestMessage(HttpMethod.Get, server);
+            if (requestVersion != null)
+            {
+                request.Version = requestVersion;
+            }
+            else
+            {
+                // The default value for HttpRequestMessage.Version is Version(1,1).
+                // So, we need to set something different to test the "unknown" version.
+                request.Version = new Version(0,0);
+            }
+
+            using (var client = new HttpClient())
+            using (HttpResponseMessage response = await client.SendAsync(request))
+            {
+                Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+                return response.Version;
+            }
+        }
         #endregion
     }
 }

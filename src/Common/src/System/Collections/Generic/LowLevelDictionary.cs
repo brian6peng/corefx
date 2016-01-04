@@ -20,9 +20,6 @@ namespace System.Collections.Generic
     ** behavior.)
     ** 
     ===========================================================*/
-#if TYPE_LOADER_IMPLEMENTATION
-    [System.Runtime.CompilerServices.ForceDictionaryLookups]
-#endif
     internal class LowLevelDictionary<TKey, TValue>
     {
         private const int DefaultSize = 17;
@@ -101,7 +98,7 @@ namespace System.Collections.Generic
                 throw new ArgumentNullException("key");
             Entry entry = Find(key);
             if (entry != null)
-                throw new ArgumentException(SR.Argument_AddingDuplicate);
+                throw new ArgumentException(SR.Format(SR.Argument_AddingDuplicate, key));
             _version++;
             UncheckedAdd(key, value);
         }
@@ -219,9 +216,6 @@ namespace System.Collections.Generic
         }
 
 
-#if TYPE_LOADER_IMPLEMENTATION
-        [System.Runtime.CompilerServices.ForceDictionaryLookups]
-#endif
         private sealed class Entry
         {
             public TKey m_key;
@@ -235,9 +229,6 @@ namespace System.Collections.Generic
         private IEqualityComparer<TKey> _comparer;
 
         // This comparator is used if no comparator is supplied. It emulates the behavior of EqualityComparer<T>.Default.
-#if TYPE_LOADER_IMPLEMENTATION
-        [System.Runtime.CompilerServices.ForceDictionaryLookups]
-#endif
         private sealed class DefaultComparer<T> : IEqualityComparer<T>
         {
             public bool Equals(T x, T y)
@@ -256,9 +247,6 @@ namespace System.Collections.Generic
             }
         }
 
-#if TYPE_LOADER_IMPLEMENTATION
-        [System.Runtime.CompilerServices.ForceDictionaryLookups]
-#endif
         protected sealed class LowLevelDictEnumerator : IEnumerator<KeyValuePair<TKey, TValue>>
         {
             public LowLevelDictEnumerator(LowLevelDictionary<TKey, TValue> dict)
@@ -327,23 +315,6 @@ namespace System.Collections.Generic
             private Entry[] _entries;
             private int _curPosition;
             private int _version;
-        }
-    }
-
-    /// <summary>
-    /// LowLevelDictionary when enumeration is needed
-    /// </summary>
-    internal sealed class LowLevelDictionaryWithIEnumerable<TKey, TValue> : LowLevelDictionary<TKey, TValue>, IEnumerable<KeyValuePair<TKey, TValue>>
-    {
-        public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator()
-        {
-            return new LowLevelDictEnumerator(this);
-        }
-
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            IEnumerator<KeyValuePair<TKey, TValue>> ie = GetEnumerator();
-            return ie;
         }
     }
 }

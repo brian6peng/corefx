@@ -39,17 +39,14 @@ namespace System.Data.SqlClient
         internal bool _supressStateChangeForReconnection;
         private int _reconnectCount;
 
+        // Transient Fault handling flag. This is needed to convey to the downstream mechanism of connection establishment, if Transient Fault handling should be used or not
+        // The downstream handling of Connection open is the same for idle connection resiliency. Currently we want to apply transient fault handling only to the connections opened
+        // using SqlConnection.Open() method. 
+        internal bool _applyTransientFaultHandling = false;
+
         public SqlConnection(string connectionString) : this()
         {
             ConnectionString = connectionString;    // setting connection string first so that ConnectionOption is available
-            CacheConnectionStringProperties();
-        }
-
-        private SqlConnection(SqlConnection connection)
-        { // Clone
-            GC.SuppressFinalize(this);
-            CopyFrom(connection);
-            _connectionString = connection._connectionString;
             CacheConnectionStringProperties();
         }
 
@@ -135,25 +132,6 @@ namespace System.Data.SqlClient
                 _AsyncCommandInProgress = value;
             }
         }
-
-
-        // Does this connection uses Integrated Security?
-        private bool UsesIntegratedSecurity(SqlConnectionString opt)
-        {
-            return opt != null ? opt.IntegratedSecurity : false;
-        }
-
-        // Does this connection uses old style of clear userID or Password in connection string?
-        private bool UsesClearUserIdOrPassword(SqlConnectionString opt)
-        {
-            bool result = false;
-            if (null != opt)
-            {
-                result = (!ADP.IsEmpty(opt.UserID) || !ADP.IsEmpty(opt.Password));
-            }
-            return result;
-        }
-
 
         internal SqlConnectionString.TypeSystem TypeSystem
         {
@@ -917,6 +895,9 @@ namespace System.Data.SqlClient
 
         private bool TryOpen(TaskCompletionSource<DbConnectionInternal> retry)
         {
+            SqlConnectionString connectionOptions = (SqlConnectionString)ConnectionOptions;
+            _applyTransientFaultHandling = (retry == null && connectionOptions != null && connectionOptions.ConnectRetryCount > 0);
+
             if (ForceNewConnection)
             {
                 if (!InnerConnection.TryReplaceConnection(this, ConnectionFactory, retry, UserConnectionOptions))

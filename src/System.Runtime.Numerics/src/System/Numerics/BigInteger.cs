@@ -94,7 +94,7 @@ namespace System.Numerics
 
                 if (_sign != 1)
                     return false;
-                int iu = Length(_bits) - 1;
+                int iu = _bits.Length - 1;
                 if ((_bits[iu] & (_bits[iu] - 1)) != 0)
                     return false;
                 while (--iu >= 0)
@@ -139,7 +139,7 @@ namespace System.Numerics
             if (_bits == null)
                 return _sign;
             int hash = _sign;
-            for (int iv = Length(_bits); --iv >= 0;)
+            for (int iv = _bits.Length; --iv >= 0;)
                 hash = NumericsHelpers.CombineHash(hash, (int)_bits[iv]);
             return hash;
         }
@@ -152,7 +152,7 @@ namespace System.Numerics
                 return _sign == other;
 
             int cu;
-            if ((_sign ^ other) < 0 || (cu = Length(_bits)) > 2)
+            if ((_sign ^ other) < 0 || (cu = _bits.Length) > 2)
                 return false;
 
             ulong uu = other < 0 ? (ulong)-other : (ulong)other;
@@ -172,7 +172,7 @@ namespace System.Numerics
             if (_bits == null)
                 return (ulong)_sign == other;
 
-            int cu = Length(_bits);
+            int cu = _bits.Length;
             if (cu > 2)
                 return false;
             if (cu == 1)
@@ -193,8 +193,8 @@ namespace System.Numerics
 
             if (_bits == null || other._bits == null)
                 return false;
-            int cu = Length(_bits);
-            if (cu != Length(other._bits))
+            int cu = _bits.Length;
+            if (cu != other._bits.Length)
                 return false;
             int cuDiff = GetDiffLength(_bits, other._bits, cu);
             return cuDiff == 0;
@@ -207,7 +207,7 @@ namespace System.Numerics
             if (_bits == null)
                 return ((long)_sign).CompareTo(other);
             int cu;
-            if ((_sign ^ other) < 0 || (cu = Length(_bits)) > 2)
+            if ((_sign ^ other) < 0 || (cu = _bits.Length) > 2)
                 return _sign;
             ulong uu = other < 0 ? (ulong)-other : (ulong)other;
             ulong uuTmp = cu == 2 ? NumericsHelpers.MakeUlong(_bits[1], _bits[0]) : _bits[0];
@@ -223,7 +223,7 @@ namespace System.Numerics
                 return -1;
             if (_bits == null)
                 return ((ulong)_sign).CompareTo(other);
-            int cu = Length(_bits);
+            int cu = _bits.Length;
             if (cu > 2)
                 return +1;
             ulong uuTmp = cu == 2 ? NumericsHelpers.MakeUlong(_bits[1], _bits[0]) : _bits[0];
@@ -249,7 +249,7 @@ namespace System.Numerics
                 return -other._sign;
             }
             int cuThis, cuOther;
-            if (other._bits == null || (cuThis = Length(_bits)) > (cuOther = Length(other._bits)))
+            if (other._bits == null || (cuThis = _bits.Length) > (cuOther = other._bits.Length))
                 return _sign;
             if (cuThis < cuOther)
                 return -_sign;
@@ -1099,7 +1099,7 @@ namespace System.Numerics
 
             // measure the exact bit count
             int c = NumericsHelpers.CbitHighZero((uint)h);
-            int b = value._bits.Length * 32 - c;
+            long b = (long)value._bits.Length * 32 - c;
 
             // extract most significant bits
             ulong x = (h << 32 + c) | (m << c) | (l >> 32 - c);
@@ -1351,7 +1351,7 @@ namespace System.Numerics
             {
                 return value._sign;  // value packed into int32 sign
             }
-            else if (Length(value._bits) > 1)
+            else if (value._bits.Length > 1)
             { // more than 32 bits
                 throw new OverflowException(SR.Overflow_Int32);
             }
@@ -1377,7 +1377,7 @@ namespace System.Numerics
             {
                 return checked((uint)value._sign);
             }
-            else if (Length(value._bits) > 1 || value._sign < 0)
+            else if (value._bits.Length > 1 || value._sign < 0)
             {
                 throw new OverflowException(SR.Overflow_UInt32);
             }
@@ -1395,7 +1395,7 @@ namespace System.Numerics
                 return value._sign;
             }
 
-            int len = Length(value._bits);
+            int len = value._bits.Length;
             if (len > 2)
             {
                 throw new OverflowException(SR.Overflow_Int64);
@@ -1429,7 +1429,7 @@ namespace System.Numerics
                 return checked((ulong)value._sign);
             }
 
-            int len = Length(value._bits);
+            int len = value._bits.Length;
             if (len > 2 || value._sign < 0)
             {
                 throw new OverflowException(SR.Overflow_UInt64);
@@ -1460,13 +1460,28 @@ namespace System.Numerics
             if (bits == null)
                 return sign;
 
-            ulong h = bits[bits.Length - 1];
-            ulong m = bits.Length > 1 ? bits[bits.Length - 2] : 0;
-            ulong l = bits.Length > 2 ? bits[bits.Length - 3] : 0;
+            int length = bits.Length;
+
+            // The maximum exponent for doubles is 1023, which corresponds to a uint bit length of 32.
+            // All BigIntegers with bits[] longer than 32 evaluate to Double.Infinity (or NegativeInfinity).
+            // Cases where the exponent is between 1024 and 1035 are handled in NumericsHelpers.GetDoubleFromParts.
+            const int infinityLength = 1024/kcbitUint;
+
+            if (length > infinityLength)
+            {
+                if (sign == 1)
+                    return Double.PositiveInfinity;
+                else
+                    return Double.NegativeInfinity;
+            }
+
+            ulong h = bits[length - 1];
+            ulong m = length > 1 ? bits[length - 2] : 0;
+            ulong l = length > 2 ? bits[length - 3] : 0;
 
             int z = NumericsHelpers.CbitHighZero((uint)h);
 
-            int exp = (bits.Length - 2) * 32 - z;
+            int exp = (length - 2) * 32 - z;
             ulong man = (h << 32 + z) | (m << z) | (l >> 32 - z);
 
             return NumericsHelpers.GetDoubleFromParts(sign, exp, man);
@@ -1478,7 +1493,7 @@ namespace System.Numerics
             if (value._bits == null)
                 return (Decimal)value._sign;
 
-            int length = Length(value._bits);
+            int length = value._bits.Length;
             if (length > 3) throw new OverflowException(SR.Overflow_Decimal);
 
             int lo = 0, mi = 0, hi = 0;
@@ -2023,15 +2038,6 @@ namespace System.Numerics
 
         // ----- SECTION: internal static utility methods ----------------*
         #region internal static utility methods
-        [Pure]
-        internal static int Length(uint[] rgu)
-        {
-            Debug.Assert(rgu[rgu.Length - 1] != 0);
-
-            // no leading zeros
-            return rgu.Length;
-        }
-
         //
         // GetPartsForBitManipulation -
         //

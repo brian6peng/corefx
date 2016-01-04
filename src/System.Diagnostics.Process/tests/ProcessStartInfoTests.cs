@@ -230,17 +230,53 @@ namespace System.Diagnostics.Tests
             }
         }
 
+        [PlatformSpecific(PlatformID.Windows)] // UseShellExecute currently not supported on Windows
         [Fact]
-        public void TestUseShellExecuteProperty()
+        public void TestUseShellExecuteProperty_SetAndGet_Windows()
         {
             ProcessStartInfo psi = new ProcessStartInfo();
+            Assert.False(psi.UseShellExecute);
 
             // Calling the setter
-            psi.UseShellExecute = false;
             Assert.Throws<PlatformNotSupportedException>(() => { psi.UseShellExecute = true; });
+            psi.UseShellExecute = false;
 
             // Calling the getter
             Assert.False(psi.UseShellExecute, "UseShellExecute=true is not supported on onecore.");
+        }
+
+        [PlatformSpecific(PlatformID.AnyUnix)]
+        [Fact]
+        public void TestUseShellExecuteProperty_SetAndGet_Unix()
+        {
+            ProcessStartInfo psi = new ProcessStartInfo();
+            Assert.False(psi.UseShellExecute);
+
+            psi.UseShellExecute = true;
+            Assert.True(psi.UseShellExecute);
+
+            psi.UseShellExecute = false;
+            Assert.False(psi.UseShellExecute);
+        }
+
+        [PlatformSpecific(PlatformID.AnyUnix)]
+        [Theory]
+        [InlineData(0)]
+        [InlineData(1)]
+        [InlineData(2)]
+        public void TestUseShellExecuteProperty_Redirects_NotSupported(int std)
+        {
+            Process p = CreateProcessLong();
+            p.StartInfo.UseShellExecute = true;
+
+            switch (std)
+            {
+                case 0: p.StartInfo.RedirectStandardInput = true; break;
+                case 1: p.StartInfo.RedirectStandardOutput = true; break;
+                case 2: p.StartInfo.RedirectStandardError = true; break;
+            }
+
+            Assert.Throws<InvalidOperationException>(() => p.Start());
         }
 
         [Fact]
@@ -259,7 +295,7 @@ namespace System.Diagnostics.Tests
         [Theory, InlineData(true), InlineData(false)]
         public void TestCreateNoWindowProperty(bool value)
         {
-            Process testProcess = CreateProcessInfinite();
+            Process testProcess = CreateProcessLong();
             try
             {
                 testProcess.StartInfo.CreateNoWindow = value;
@@ -290,7 +326,7 @@ namespace System.Diagnostics.Tests
                 return; // test is irrelevant if we can't add a user
             }
 
-            Process p = CreateProcessInfinite();
+            Process p = CreateProcessLong();
 
             p.StartInfo.LoadUserProfile = true;
             p.StartInfo.UserName = username;
@@ -345,7 +381,7 @@ namespace System.Diagnostics.Tests
             // check defaults
             Assert.Equal(string.Empty, _process.StartInfo.WorkingDirectory);
 
-            Process p = CreateProcessInfinite();
+            Process p = CreateProcessLong();
             p.StartInfo.WorkingDirectory = Directory.GetCurrentDirectory();
 
             try
